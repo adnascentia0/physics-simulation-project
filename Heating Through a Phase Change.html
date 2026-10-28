@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Heating Through a Phase Change</title>
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--fg:#16202b;--mut:#5a6676;--line:#dce1e7;--acc:#1d4ed8;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e141b;--card:#17202a;--fg:#e8edf3;--mut:#9aa7b6;--line:#2a3542;--acc:#7cb0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e141b;--card:#17202a;--fg:#e8edf3;--mut:#9aa7b6;--line:#2a3542;--acc:#7cb0ff;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--mut);margin:0 0 14px;max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:14px;align-items:start}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+h2{font-size:.95rem;margin:0 0 10px}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin-bottom:10px;align-items:center}
+.ctl label{font-weight:600}.ctl input[type=range]{grid-column:1/3;width:100%;accent-color:var(--acc)}
+.num{color:var(--mut);white-space:nowrap}
+.num input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.num input{width:76px;text-align:right}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
+button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.go{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600;min-width:96px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.warn{color:#dc2626;min-height:1.3em;margin:6px 0 0;font-size:.9rem}
+canvas{display:block;width:100%;border-radius:6px}
+#pc{aspect-ratio:1/.85;background:var(--bg);border:1px solid var(--line)}
+#lc{aspect-ratio:16/10}
+.ro{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 6px}
+.ro span{color:var(--mut);font-size:.8rem}.ro b{display:block;font-size:1.05rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ph{font-weight:600}.cap{color:var(--mut);margin:4px 0 0;min-height:3em}
+table{width:100%;border-collapse:collapse;font-size:.88rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:600}
+tr.on td{background:color-mix(in srgb,var(--acc) 14%,transparent);font-weight:600}
+.note{color:var(--mut);font-size:.82rem;margin:8px 0 0}
+</style></head><body><main>
+<h1>Heating through a phase change</h1>
+<p class="sub">Constant power goes into a sample of water. Watch where the energy goes: into faster motion (temperature rises) or into breaking bonds (temperature stays flat).</p>
+<div class="grid">
+<div class="col">
+ <section class="card"><h2>Parameters</h2>
+  
+  <div id="ctls"></div>
+  <div class="ctl"><label for="spd">Playback speed</label><span class="num" id="spdv"></span><input type="range" id="spd" min="0" max="100" step="0.1" value="30.3"></div>
+  <div class="row"><button class="go" id="run">Start</button><button id="rst">Reset</button></div>
+  <p class="warn" id="warn"></p>
+ </section>
+ <section class="card"><h2>Energy needed at each stage</h2>
+  <table><thead><tr><th>Stage</th><th>Formula</th><th>Energy</th><th>Time</th></tr></thead><tbody id="tb"></tbody></table>
+  <p class="note">Assumes 1 atm, no heat loss. c(ice) = 2,100 J/kg·K; c(water) = 4,186 J/kg·K; c(steam) = 2,010 J/kg·K; L<sub>f</sub> = 333,000 J/kg; L<sub>v</sub> = 2,260,000 J/kg. Melting at 0 °C, boiling at 100 °C. If the final temperature is exactly 0 or 100 °C the run stops as that temperature is first reached.</p>
+ </section>
+</div>
+<div class="col">
+ <section class="card"><h2>Particle view</h2>
+  <canvas id="pc"></canvas>
+  <div class="ro"><div><span>Time</span><b id="rt">0.00 s</b></div><div><span>Temperature</span><b id="rT">0.00 °C</b></div><div><span>Heat added</span><b id="rQ">0.00 J</b></div></div>
+  <div class="ph" id="rph"></div><p class="cap" id="cap"></p><p class="note" id="pn"></p>
+ </section>
+ <section class="card"><h2>Temperature vs time</h2><canvas id="lc"></canvas><div class="ctl" style="margin:12px 0 0"><label for="scr">Timeline</label><span class="num" id="scrv"></span><input type="range" id="scr" min="0" max="10000" step="1" value="0"></div></section>
+</div></div></main>
+<script>
+const C={ci:2100,cw:4186,cs:2010,lf:333e3,lv:2260e3};
+const fmt=x=>x.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const cfg=[["P","Heater power","W",10,1000,10],["m","Sample mass","kg",0.01,1,0.01],["Ti","Initial temperature","°C",-50,150,1],["Tf","Final temperature","°C",-50,200,1]];
+const v={P:100,m:0.10,Ti:-10,Tf:20};
+const NAME={s:"Heating ice",m:"Melting (fusion)",l:"Heating water",v:"Boiling (vaporization)",g:"Heating steam"};
+const PHL={s:"Solid (ice)",m:"Melting: solid + liquid",l:"Liquid water",v:"Boiling: liquid + gas",g:"Steam (gas)"};
+const RGB={s:"56,189,248",m:"245,158,11",l:"59,130,246",v:"239,68,68",g:"251,146,60"};
+const PCOL=["#7dd3fc","#3b82f6","#fb923c"];
+const $=id=>document.getElementById(id);
+let model=[],Qtot=0,tEnd=0,t=0,running=false,lastIdx=-1,clock=0;
+
+/* ---- controls ---- */
+const inp={};
+cfg.forEach(([k,lab,u,mn,mx,st])=>{
+ const d=document.createElement("div");d.className="ctl";
+ d.innerHTML=`<label for="r${k}">${lab}</label><span class="num"><input type="number" id="n${k}" min="${mn}" max="${mx}" step="${st}"> ${u}</span><input type="range" id="r${k}" min="${mn}" max="${mx}" step="${st}">`;
+ $("ctls").appendChild(d);
+ const r=d.querySelector("[type=range]"),n=d.querySelector("[type=number]");inp[k]=[r,n];
+ const set=x=>{if(isNaN(x))return;v[k]=Math.min(mx,Math.max(mn,x));sync();reset()};
+ r.oninput=()=>set(+r.value);n.onchange=()=>set(+n.value);
+});
+function sync(){cfg.forEach(([k])=>{inp[k][0].value=v[k];inp[k][1].value=v[k]})}
+const sel=$("spd"),scr=$("scr"),SMAX=2000;
+const showSpd=()=>$("spdv").textContent=fmt(speed())+"×";
+sel.oninput=showSpd;
+scr.oninput=()=>{t=tEnd*scr.value/10000;running=false;$("run").textContent=t>0?"Resume":"Start"};
+const speed=()=>Math.pow(SMAX,sel.value/100);
+
+
+/* ---- physics ---- */
+function build(m,Ti,Tf){
+ const S=[];let Q=0;
+ const add=(ph,kind,T0,T1,q,f)=>{S.push({ph,kind,T0,T1,Q0:Q,Q1:Q+q,f});Q+=q};
+ let ph=Ti<=0?"s":Ti<=100?"l":"g",T=Ti;
+ if(ph==="s"){const e=Math.min(0,Tf);if(e>T)add("s","heat",T,e,m*C.ci*(e-T),"m·c·ΔT");T=e;
+  if(Tf>0){add("m","latent",0,0,m*C.lf,"m·L<sub>f</sub>");ph="l";T=0}}
+ if(ph==="l"){const e=Math.min(100,Tf);if(e>T)add("l","heat",T,e,m*C.cw*(e-T),"m·c·ΔT");T=e;
+  if(Tf>100){add("v","latent",100,100,m*C.lv,"m·L<sub>v</sub>");ph="g";T=100}}
+ if(ph==="g"&&Tf>T)add("g","heat",T,Tf,m*C.cs*(Tf-T),"m·c·ΔT");
+ return{S,total:Q};
+}
+function stateAt(Q){
+ Q=Math.min(Math.max(Q,0),Qtot);
+ let i=model.findIndex(s=>Q<=s.Q1);if(i<0)i=model.length-1;
+ const s=model[i],f=s.Q1>s.Q0?(Q-s.Q0)/(s.Q1-s.Q0):1;
+ const T=s.kind==="heat"?s.T0+(s.T1-s.T0)*f:s.T0;let fs=0,fl=0,fg=0;
+ if(s.ph==="s")fs=1;else if(s.ph==="m"){fs=1-f;fl=f}else if(s.ph==="l")fl=1;else if(s.ph==="v"){fl=1-f;fg=f}else fg=1;
+ return{T,i,f,fs,fl,fg,s,Q};
+}
+function reset(){
+ const ok=v.Tf>v.Ti;$("warn").textContent=ok?"":"Final temperature must be higher than initial temperature.";
+ $("run").disabled=!ok;running=false;t=0;lastIdx=-1;$("run").textContent="Start";
+ const b=ok?build(v.m,v.Ti,v.Tf):{S:[],total:0};model=b.S;Qtot=b.total;tEnd=Qtot/v.P;
+ 
+ $("tb").innerHTML=model.map((s,i)=>`<tr id="row${i}"><td>${NAME[s.ph]}${s.kind==="heat"?` (${fmt(s.T0)}→${fmt(s.T1)} °C)`:` (${fmt(s.T0)} °C)`}</td><td>${s.f}</td><td>${fmt(s.Q1-s.Q0)} J</td><td>${fmt((s.Q1-s.Q0)/v.P)} s</td></tr>`).join("")+
+  (model.length?`<tr><td><b>Total</b></td><td></td><td><b>${fmt(Qtot)} J</b></td><td><b>${fmt(tEnd)} s</b></td></tr>`:"");
+ initP();
+}
+$("run").onclick=()=>{if(t>=tEnd)reset();running=!running;$("run").textContent=running?"Pause":"Resume"};
+$("rst").onclick=reset;
+
+/* ---- canvas helpers ---- */
+function fit(c){const d=devicePixelRatio||1,r=c.getBoundingClientRect();c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);const x=c.getContext("2d");x.setTransform(d,0,0,d,0,0);return[r.width,r.height,x]}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---- particles (schematic molecular dynamics) ---- */
+let N=0,pts=[],bonds=[],W=0,H=0,px,sp=20,rad=8,rg=4.4,floor=0,cols=1,rows=1;
+const rn=()=>Math.sqrt(-2*Math.log(1-Math.random()))*Math.cos(6.283*Math.random());
+const OM2=484,KR=1800,thermal=T=>2.2*sp*Math.sqrt((T+273.15)/273);
+const assign=st=>{const ng=Math.round(st.fg*N),nl=Math.round(st.fl*N);return p=>p.g<ng?2:p.k<ng+nl?1:0};
+function initP(){
+ [W,H,px]=fit($("pc"));if(!model.length)return;
+ N=Math.round(40+260*Math.pow(v.m,.6));floor=H-12;
+ let best=0;for(let c=4;c<=40;c++){const r=Math.ceil(N/c),s=Math.min(.9*W/c,.5*floor/r);if(s>best){best=s;cols=c;rows=r}}
+ sp=best;rad=.4*sp;rg=.55*rad;const x0=(W-cols*sp)/2;pts=[];
+ for(let i=0;i<N;i++){const c=i%cols,r=(i/cols)|0;pts.push({hx:x0+sp*(c+.5),hy:floor-sp*(r+.5),key:(rows-1-r)+3*Math.random(),g:0,k:0,ph:0,ax:0,ay:0})}
+ pts.slice().sort((a,b)=>a.key-b.key).forEach((p,i)=>p.k=i);
+ pts.map(p=>[Math.random(),p]).sort((a,b)=>a[0]-b[0]).forEach(([,p],i)=>p.g=i);
+ const st=stateAt(0),f=assign(st),s0=thermal(st.T);
+ for(const p of pts){p.ph=f(p);p.x=p.hx;p.y=p.hy;p.vx=s0*rn();p.vy=s0*rn();
+  if(p.ph===2){p.x=rad+Math.random()*(W-2*rad);p.y=rad+Math.random()*(floor-2*rad)}}
+ for(let i=0;i<240;i++)stepP(1/120,st,false);
+ $("pn").textContent=`Showing ${N} particles for ${fmt(v.m)} kg (about ${fmt(v.m*1000/N)} g each). Schematic, not to scale.`;
+}
+function stepP(h,st,last){
+ const s0=thermal(st.T),f=assign(st),d=2*rad,rc=2.4*d,A=6*sp,G=14*sp;
+ if(last)bonds.length=0;
+ for(const p of pts){const ph=f(p);if(ph!==p.ph){p.ph=ph;if(ph>0){p.vx=s0*rn();p.vy=s0*rn()}}
+  p.ax=0;p.nn=0;p.ay=ph===1?G:0;if(ph===0){p.ax=-OM2*(p.x-p.hx);p.ay=-OM2*(p.y-p.hy)}}
+ for(let i=0;i<N;i++){const p=pts[i];for(let j=i+1;j<N;j++){const q=pts[j];if(p.ph+q.ph===0)continue;
+  const dx=q.x-p.x,dy=q.y-p.y,r2=dx*dx+dy*dy;if(r2>rc*rc||r2<1e-9)continue;
+  const r=Math.sqrt(r2),L=(p.ph===1)+(q.ph===1),S=(p.ph===0)+(q.ph===0),both=L===2,c=both?1:L===1&&S===1?.5:0;let fa=c*A*(r<d?1:Math.max(0,1-(r-d)/(rc-d)));
+  const dd=(p.ph===2?rg:rad)+(q.ph===2?rg:rad);if(r<dd)fa-=KR*(dd-r);
+  if(both&&r<1.6*d){p.nn++;q.nn++}
+  if(last&&both&&r<1.35*d)bonds.push([p,q]);
+  const fx=fa*dx/r,fy=fa*dy/r;p.ax+=fx;p.ay+=fy;q.ax-=fx;q.ay-=fy}}
+ for(const p of pts){const g=p.ph===0?3:p.ph===1?(p.nn<3?16:4):.9,k=s0*Math.sqrt(2*g*h);
+  p.vx+=(p.ax-g*p.vx)*h+k*rn();p.vy+=(p.ay-g*p.vy)*h+k*rn();if(p.ph===1){const m=2.5*s0,s=Math.hypot(p.vx,p.vy);if(s>m){p.vx*=m/s;p.vy*=m/s}}p.x+=p.vx*h;p.y+=p.vy*h;
+  const R=p.ph===2?rg:rad,w=p.ph===2?.35*s0:0;if(p.x<R){p.x=R;p.vx=Math.abs(p.vx);p.vy+=w*rn()}else if(p.x>W-R){p.x=W-R;p.vx=-Math.abs(p.vx);p.vy+=w*rn()}
+  if(p.y<R){p.y=R;p.vy=Math.abs(p.vy);p.vx+=w*rn()}else if(p.y>floor-R){p.y=floor-R;p.vy=-Math.abs(p.vy)*(p.ph===1?.2:1);p.vx+=w*rn()}}
+}
+function drawP(st){
+ const g=px;g.clearRect(0,0,W,H);g.lineCap="round";
+ const hot=running?Math.min(1,.35+v.P/700):.1;
+ g.fillStyle=`rgba(239,68,68,${hot})`;g.fillRect(0,floor,W,H-floor);
+ g.strokeStyle=css("--mut");g.lineWidth=1.5;g.beginPath();
+ for(let x=4;x<W-4;x+=10){g.lineTo(x,floor+(((x/10)|0)%2?9:3))}g.stroke();
+ g.fillStyle="rgba(125,211,252,.13)";g.beginPath();for(const p of pts)if(p.ph===0){g.moveTo(p.x+rad*1.3,p.y);g.arc(p.x,p.y,rad*1.3,0,6.283)}g.fill();
+ g.fillStyle="rgba(59,130,246,.2)";g.beginPath();for(const p of pts)if(p.ph===1){g.moveTo(p.x+rad*1.8,p.y);g.arc(p.x,p.y,rad*1.8,0,6.283)}g.fill();
+ g.strokeStyle="rgba(125,211,252,.9)";g.lineWidth=Math.max(1.5,rad*.35);g.beginPath();
+ for(let i=0;i<N;i++){const p=pts[i];if(p.ph)continue;const r=pts[i+1],u=pts[i+cols];
+  if(i%cols<cols-1&&r&&r.ph===0){g.moveTo(p.x,p.y);g.lineTo(r.x,r.y)}
+  if(u&&u.ph===0){g.moveTo(p.x,p.y);g.lineTo(u.x,u.y)}}
+ g.stroke();
+ g.strokeStyle="rgba(59,130,246,.55)";g.lineWidth=1.8;g.beginPath();
+ for(const[a,b]of bonds){g.moveTo(a.x,a.y);g.lineTo(b.x,b.y)}g.stroke();
+ g.strokeStyle="rgba(251,146,60,.4)";g.lineWidth=1.5;g.beginPath();
+ for(const p of pts)if(p.ph===2){g.moveTo(p.x,p.y);g.lineTo(p.x-p.vx*.1,p.y-p.vy*.1)}g.stroke();
+ for(const p of pts){g.fillStyle=PCOL[p.ph];g.beginPath();g.arc(p.x,p.y,p.ph===2?rg:rad,0,6.283);g.fill()}
+ g.font="12px system-ui";g.textBaseline="middle";let x=10;
+ [["Solid",0],["Liquid",1],["Gas",2]].forEach(([n,i])=>{g.fillStyle=PCOL[i];g.beginPath();g.arc(x+5,14,5,0,6.283);g.fill();g.fillStyle=css("--mut");g.fillText(n,x+14,14);x+=g.measureText(n).width+34});
+}
+
+/* ---- plot ---- */
+let LW=0,LH=0,lx;
+function ticks(a,b,n){const r=(b-a)/n,p=10**Math.floor(Math.log10(r)),f=r/p,s=(f<1.5?1:f<3?2:f<7?5:10)*p,o=[];for(let x=Math.ceil(a/s)*s;x<=b+1e-9;x+=s)o.push(+x.toFixed(6));return o}
+function drawPlot(st){
+ if(!model.length){lx.clearRect(0,0,LW,LH);return}
+ const g=lx,L=46,R=12,Tp=10,Bt=34,w=LW-L-R,h=LH-Tp-Bt,y0=Math.min(v.Ti,v.Tf),y1=Math.max(v.Ti,v.Tf),pad=(y1-y0)*.06+1,ya=y0-pad,yb=y1+pad;
+ const X=s=>L+s/tEnd*w,Y=T=>Tp+(1-(T-ya)/(yb-ya))*h,fg=css("--fg"),mut=css("--mut"),line=css("--line");
+ g.clearRect(0,0,LW,LH);g.font="11px system-ui";g.textBaseline="middle";
+ model.forEach(s=>{const a=X(s.Q0/v.P),b=X(s.Q1/v.P);g.fillStyle=`rgba(${RGB[s.ph]},.16)`;g.fillRect(a,Tp,b-a,h);
+  if(b-a>44){g.fillStyle=mut;g.textAlign="center";g.fillText(s.ph==="m"?"Melting":s.ph==="v"?"Boiling":s.ph==="s"?"Ice":s.ph==="l"?"Water":"Steam",(a+b)/2,Tp+9)}});
+ g.strokeStyle=line;g.lineWidth=1;g.fillStyle=mut;g.textAlign="right";
+ ticks(ya,yb,6).forEach(T=>{g.beginPath();g.moveTo(L,Y(T));g.lineTo(L+w,Y(T));g.stroke();g.fillText(T,L-6,Y(T))});
+ g.textAlign="center";g.textBaseline="top";
+ ticks(0,tEnd,6).forEach(s=>{g.beginPath();g.moveTo(X(s),Tp);g.lineTo(X(s),Tp+h);g.stroke();g.fillText(s,X(s),Tp+h+5)});
+ g.fillText("Time (s)",L+w/2,LH-14);g.save();g.translate(11,Tp+h/2);g.rotate(-Math.PI/2);g.textBaseline="middle";g.fillText("Temperature (°C)",0,0);g.restore();
+ const full=[[0,v.Ti],...model.map(s=>[s.Q1/v.P,s.T1])];
+ g.setLineDash([5,4]);g.strokeStyle=mut;g.lineWidth=1.2;g.beginPath();full.forEach(([s,T],i)=>i?g.lineTo(X(s),Y(T)):g.moveTo(X(s),Y(T)));g.stroke();g.setLineDash([]);
+ g.strokeStyle=fg;g.lineWidth=2.4;g.beginPath();g.moveTo(X(0),Y(v.Ti));
+ full.slice(1).forEach(([s,T])=>{if(s<=t)g.lineTo(X(s),Y(T))});g.lineTo(X(t),Y(st.T));g.stroke();
+ g.fillStyle=`rgb(${RGB[st.s.ph]})`;g.strokeStyle=fg;g.lineWidth=1.5;g.beginPath();g.arc(X(t),Y(st.T),5,0,6.283);g.fill();g.stroke();
+}
+
+/* ---- UI + loop ---- */
+const CAP={heat:"Energy raises the molecules’ average kinetic energy, so the temperature rises: Q = m·c·ΔT.",
+ latent:"Energy goes into breaking intermolecular bonds (potential energy), not into faster motion. The molecules’ speed, and so the temperature, stays constant: Q = m·L."};
+function ui(st){
+ $("rt").textContent=fmt(t)+" s";$("rT").textContent=fmt(st.T)+" °C";$("rQ").textContent=fmt(st.Q)+" J";
+ const s=st.s;$("rph").textContent=PHL[s.ph]+(s.kind==="latent"?` (${fmt(st.f*100)}% ${s.ph==="m"?"melted":"vaporized"})`:"")+(t>=tEnd?" · target reached":"");
+ $("cap").textContent=CAP[s.kind];
+ if(document.activeElement!==scr)scr.value=tEnd?t/tEnd*10000:0;
+ $("scrv").textContent=fmt(t)+" s";
+ if(st.i!==lastIdx){document.querySelectorAll("#tb tr").forEach(r=>r.classList.remove("on"));const r=$("row"+st.i);if(r)r.classList.add("on");lastIdx=st.i}
+}
+let last=performance.now();
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;clock+=dt;
+ if(model.length){
+  if(running){t=Math.min(tEnd,t+dt*speed());if(t>=tEnd){running=false;$("run").textContent="Run again"}}
+  const st=stateAt(v.P*t);const n=Math.min(6,Math.max(2,Math.ceil(dt*120)));for(let i=0;i<n;i++)stepP(dt/n,st,i===n-1);drawP(st);drawPlot(st);ui(st);
+ }
+ requestAnimationFrame(frame);
+}
+function layout(){[LW,LH,lx]=fit($("lc"));initP()}
+addEventListener("resize",layout);
+sync();showSpd();reset();layout();requestAnimationFrame(frame);
+</script></body></html>
